@@ -1,0 +1,14 @@
+version: '3'
+services:
+  icarus-verilog:
+    build: ./docker
+    container_name: icarus_verilog_container
+    volumes:
+      - ./local_files:/verilog_files
+    networks:
+      - verilog_network
+    entrypoint: ["/usr/local/bin/process_verilog.sh", "/verilog_files/latest_file.v"]
+
+networks:
+  verilog_network:
+    driver: bridge
