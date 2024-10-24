@@ -1,22 +1,33 @@
-# Use an official Ubuntu base image
-FROM ubuntu:latest
+# Use an official Python base image
+FROM python:3.9-slim
 
-# Set up environment variables
+# Set environment variables to prevent prompts during installation
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Install Icarus Verilog and dependencies
+# Install Icarus Verilog and other dependencies
 RUN apt-get update && apt-get install -y \
     iverilog \
-    git \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Create a directory for the Verilog files
-WORKDIR /verilog_files
+# Set the working directory
+WORKDIR /usr/src/app
 
-# Copy the shell script to the container
-COPY ./scripts/process_verilog.sh /usr/local/bin/process_verilog.sh
-RUN chmod +x /usr/local/bin/process_verilog.sh
+# Copy the requirements.txt first to leverage Docker layer caching
+COPY ./requirements.txt /usr/src/app/requirements.txt
 
-# Define entry point (could be overridden in docker-compose or script)
-ENTRYPOINT ["/bin/bash"]
+# Install Python dependencies
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy the rest of the application code
+COPY ./app /usr/src/app
+COPY ./scripts /usr/src/app/scripts
+
+# Make the shell script executable
+RUN chmod +x /usr/src/app/scripts/process_verilog.sh
+
+# Expose the FastAPI port
+EXPOSE 8000
+
+# Command to run FastAPI on container startup
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]

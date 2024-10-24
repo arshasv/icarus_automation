@@ -1,14 +1,18 @@
 version: '3'
 services:
-  icarus-verilog:
-    build: ./docker
-    container_name: icarus_verilog_container
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
     volumes:
-      - ./local_files:/verilog_files
-    networks:
-      - verilog_network
-    entrypoint: ["/usr/local/bin/process_verilog.sh", "/verilog_files/latest_file.v"]
+      - ./local_files:/usr/src/app/local_files
+    environment:
+      - AZURE_STORAGE_CONNECTION_STRING=${AZURE_STORAGE_CONNECTION_STRING}
+      - BLOB_CONTAINER_NAME=${BLOB_CONTAINER_NAME}
+
 
 networks:
-  verilog_network:
+  default:
     driver: bridge

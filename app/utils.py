@@ -1,21 +1,15 @@
-import os
 import requests
-from .config import LOCAL_FILE_PATH
+import os
 
 def download_blob(blob_url, download_path):
-    """Download a blob from the provided URL."""
+    """Download a blob file from the passed URL to a local directory."""
     try:
-        # Ensure the directory for local files exists
-        os.makedirs(LOCAL_FILE_PATH, exist_ok=True)
-        
-        # Send GET request to download the file
         response = requests.get(blob_url)
-        response.raise_for_status()  # Raise an error for bad responses
-        
-        # Write the content to a local file
-        with open(download_path, "wb") as download_file:
-            download_file.write(response.content)
-        print(f"Downloaded file from {blob_url} to {download_path}")
-        
+        if response.status_code == 200:
+            with open(download_path, 'wb') as f:
+                f.write(response.content)
+            print(f"Downloaded {blob_url} to {download_path}")
+        else:
+            raise Exception(f"Failed to download file from {blob_url}. Status code: {response.status_code}")
     except Exception as e:
-        raise Exception(f"Failed to download blob: {str(e)}")
+        raise Exception(f"Error downloading file: {str(e)}")
