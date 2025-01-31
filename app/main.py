@@ -23,8 +23,15 @@ async def process_verilog(blob_url: str = Body(..., embed=True)):
         # Download the .v file from Azure Blob (or the passed URL)
         download_blob(blob_url, local_file_path)
         
+        # Path to the error log file
+        error_log_path = "error_log.txt"
+        
         # Run the shell script to install Icarus Verilog and process the downloaded .v file
-        result = subprocess.run([f"./scripts/process_verilog.sh", local_file_path], check=True)
+        result = subprocess.run(
+            [f"./scripts/process_verilog.sh", local_file_path],
+            stderr=subprocess.PIPE,  # Capture error output
+            text=True,               # Decode bytes to string
+        )
         
         # If processing is successful, send a message to RabbitMQ
         message = {
@@ -37,7 +44,20 @@ async def process_verilog(blob_url: str = Body(..., embed=True)):
         return {"message": "Icarus Verilog container executed successfully and message sent to RabbitMQ"}
     
     except subprocess.CalledProcessError as e:
-        raise HTTPException(status_code=500, detail=f"Shell script error: {str(e)}")
+        # Read the contents of the error log if it exists
+        error_log_contents = ""
+        if os.path.exists("error_log.txt"):
+            with open("error_log.txt", "r") as f:
+                error_log_contents = f.read()
+        
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "error": f"Shell script error: {str(e)}",
+                "stderr": e.stderr,
+                "error_log": error_log_contents,
+            }
+        )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
