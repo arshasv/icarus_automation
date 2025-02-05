@@ -35,5 +35,5 @@ ENV RABBITMQ_PORT=5672
 ENV QUEUE_NAME=verilog_processing
 
 # Command to run FastAPI on container startup
-CMD sh -c "uvicorn main:app --host 0.0.0.0 --port 8000 & sleep 2 && cat /usr/src/app/error_log.txt"
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
 

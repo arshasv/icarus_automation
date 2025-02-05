@@ -14,50 +14,30 @@ QUEUE_NAME = "verilog_processing"
 @app.post("/process-verilog/")
 async def process_verilog(blob_url: str = Body(..., embed=True)):
     try:
-        # Extract file name from the passed URL
         blob_name = blob_url.split("/")[-1]
-        
-        # Set the local file path where the file will be downloaded
         local_file_path = os.path.join(LOCAL_FILE_PATH, blob_name)
-        
-        # Download the .v file from Azure Blob (or the passed URL)
+
+        # Download the .v file
         download_blob(blob_url, local_file_path)
-        
-        # Path to the error log file
-        error_log_path = "error_log.txt"
-        
-        # Run the shell script to install Icarus Verilog and process the downloaded .v file
-        result = subprocess.run(
-            [f"./scripts/process_verilog.sh", local_file_path],
-            stderr=subprocess.PIPE,  # Capture error output
-            text=True,               # Decode bytes to string
-        )
-        
-        # If processing is successful, send a message to RabbitMQ
-        message = {
-            "status": "success",
-            "file": blob_name,
-            "path": local_file_path
-        }
-        send_to_rabbitmq(message)
-        
-        return {"message": "Icarus Verilog container executed successfully and message sent to RabbitMQ"}
-    
+
+        # Run shell script
+        subprocess.run(["./scripts/process_verilog.sh", local_file_path], check=True)
+
+        # Check for error output
+        error_file = "error_output.json"
+        if os.path.exists(error_file):
+            with open(error_file, "r") as f:
+                error_data = json.load(f)
+            
+            send_to_rabbitmq(error_data)  # Send error details to RabbitMQ
+
+            if error_data["status"] == "error":
+                raise HTTPException(status_code=500, detail=error_data["message"])
+
+        return {"message": "Icarus Verilog container executed successfully."}
+
     except subprocess.CalledProcessError as e:
-        # Read the contents of the error log if it exists
-        error_log_contents = ""
-        if os.path.exists("error_log.txt"):
-            with open("error_log.txt", "r") as f:
-                error_log_contents = f.read()
-        
-        raise HTTPException(
-            status_code=500,
-            detail={
-                "error": f"Shell script error: {str(e)}",
-                "stderr": e.stderr,
-                "error_log": error_log_contents,
-            }
-        )
+        raise HTTPException(status_code=500, detail=f"Shell script error: {str(e)}")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -65,14 +45,14 @@ async def process_verilog(blob_url: str = Body(..., embed=True)):
 def send_to_rabbitmq(message: dict):
     try:
         connection = pika.BlockingConnection(
-            pika.ConnectionParameters(host=os.getenv('RABBITMQ_HOST', 'localhost'))
+            pika.ConnectionParameters(host=RABBITMQ_HOST)
         )
         channel = connection.channel()
         channel.queue_declare(queue=QUEUE_NAME, durable=True)
         channel.basic_publish(
             exchange='',
             routing_key=QUEUE_NAME,
-            body=str(message),
+            body=json.dumps(message),
             properties=pika.BasicProperties(delivery_mode=2),
         )
         print(f" [x] Sent {message}")

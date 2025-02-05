@@ -11,26 +11,35 @@ fi
 # Get the file path from the first argument
 v_file_path=$1
 
-# Define the error log path
-error_log="/usr/src/app/error_log.txt"
+# Define the log file for errors
+error_log="error_log.txt"
 
 # Verify the file exists
 if [ -f "$v_file_path" ]; then
-    echo "Processing $v_file_path with Icarus Verilog..." >> "$error_log"
-
+    echo "Processing $v_file_path with Icarus Verilog..."
+    
     # Run Icarus Verilog and capture errors
-    if ! iverilog -o output_file "$v_file_path" 2>> "$error_log"; then
-        echo "Icarus Verilog compilation failed. Check error_log.txt for details." >> "$error_log"
-    else
-        vvp output_file >> "$error_log" 2>&1
+    iverilog -o output_file "$v_file_path" 2> "$error_log"
+    
+    # Check if iverilog encountered any errors
+    if [ $? -ne 0 ]; then
+        echo "Error during iverilog compilation. Check $error_log for details."
+        echo "{\"status\":\"error\", \"message\":\"Compilation failed\", \"log\":\"$(cat $error_log)\"}" > error_output.json
+        exit 1
     fi
-
-    echo "Verilog processing completed." >> "$error_log"
+    
+    # Run the simulation and capture runtime errors
+    vvp output_file 2>> "$error_log"
+    
+    # Check if vvp encountered any errors
+    if [ $? -ne 0 ]; then
+        echo "Error during simulation. Check $error_log for details."
+        echo "{\"status\":\"error\", \"message\":\"Simulation failed\", \"log\":\"$(cat $error_log)\"}" > error_output.json
+        exit 1
+    fi
+    
+    echo "{\"status\":\"success\", \"message\":\"Verilog processing completed successfully.\"}" > error_output.json
 else
-    echo "Error: File not found!" >> "$error_log"
+    echo "{\"status\":\"error\", \"message\":\"File not found!\"}" > error_output.json
     exit 1
 fi
-
-# Output the contents of the error log to the container's standard output
-echo "---- Error Log ----"
-cat "$error_log"
