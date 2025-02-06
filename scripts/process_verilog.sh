@@ -14,6 +14,9 @@ v_file_path=$1
 # Define the log file for errors
 error_log="error_log.txt"
 
+# Remove previous log files
+rm -f success_output.json error_output.json error_log.txt
+
 # Verify the file exists
 if [ -f "$v_file_path" ]; then
     echo "Processing $v_file_path with Icarus Verilog..."
@@ -24,7 +27,7 @@ if [ -f "$v_file_path" ]; then
     # Check if iverilog encountered any errors
     if [ $? -ne 0 ]; then
         echo "Error during iverilog compilation. Check $error_log for details."
-        echo "{\"status\":\"error\", \"message\":\"Compilation failed\", \"log\":\"$(cat $error_log)\"}" > error_output.json
+        echo "{\"status\":\"error\", \"message\":\"Compilation failed\", \"log\":\"$(cat $error_log | tr '\n' ' ')\"}" > error_output.json
         exit 1
     fi
     
@@ -34,7 +37,7 @@ if [ -f "$v_file_path" ]; then
     # Check if vvp encountered any errors
     if [ $? -ne 0 ]; then
         echo "Error during simulation. Check $error_log for details."
-        echo "{\"status\":\"error\", \"message\":\"Simulation failed\", \"log\":\"$(cat $error_log)\"}" > error_output.json
+        echo "{\"status\":\"error\", \"message\":\"Simulation failed\", \"log\":\"$(cat $error_log | tr '\n' ' ')\"}" > error_output.json
         exit 1
     fi
     

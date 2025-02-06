@@ -21,43 +21,51 @@ async def process_verilog(blob_url: str = Body(..., embed=True)):
         # Download the .v file
         download_blob(blob_url, local_file_path)
 
+        # Define error log file
+        error_log_file = "error_log.txt"
+
+        # Remove previous error log if exists
+        if os.path.exists(error_log_file):
+            os.remove(error_log_file)
+
         # Run shell script
-        subprocess.run(["./scripts/process_verilog.sh", local_file_path], check=True)
+        result = subprocess.run(["./scripts/process_verilog.sh", local_file_path], check=False)
 
-        # Check for output files
-        error_file = "error_output.json"
-        success_file = "success_output.json"
+        # Check if error log file exists after running the script
+        error_log = read_error_log()
 
-        if os.path.exists(error_file):
-            with open(error_file, "r") as f:
-                error_data = json.load(f)
+        if result.returncode != 0 or error_log:
+            response_data = {
+                "status": "error",
+                "message": "Compilation failed",
+                "log": error_log if error_log else "No additional error details available."
+            }
+            send_to_rabbitmq(response_data)
+            raise HTTPException(status_code=400, detail=response_data)
 
-            print(f" [x] Sent {error_data}")  # Log the error message before raising an exception
-            send_to_rabbitmq(error_data)
-            raise HTTPException(status_code=500, detail=error_data["message"])
-
-        if os.path.exists(success_file):
-            with open(success_file, "r") as f:
-                success_data = json.load(f)
-
-            print(f" [x] Sent {success_data}")  # Log the success message
-            send_to_rabbitmq(success_data)
-            return success_data
-
-        # If neither file exists, assume an unknown failure
-        raise HTTPException(status_code=500, detail="Unexpected error occurred. No output file was created.")
-
-    except subprocess.CalledProcessError as e:
-        error_message = {"status": "error", "message": f"Shell script error: {str(e)}"}
-        print(f" [x] Sent {error_message}")  # Log the error before raising
-        send_to_rabbitmq(error_message)
-        raise HTTPException(status_code=500, detail=error_message["message"])
+        # Success response (unchanged)
+        message = {"status": "success", "message": "Verification successful."}
+        send_to_rabbitmq(message)
+        return message
 
     except Exception as e:
-        error_message = {"status": "error", "message": str(e)}
-        print(f" [x] Sent {error_message}")  # Log the error before raising
-        send_to_rabbitmq(error_message)
-        raise HTTPException(status_code=500, detail=error_message["message"])
+        error_log = read_error_log()
+        response_data = {
+            "status": "error",
+            "message": "Compilation failed",
+            "log": error_log if error_log else "No additional error details available."
+        }
+        send_to_rabbitmq(response_data)
+        raise HTTPException(status_code=400, detail=response_data)
+
+
+def read_error_log():
+    """Reads the contents of error_log.txt if it exists."""
+    error_log_file = "error_log.txt"
+    if os.path.exists(error_log_file):
+        with open(error_log_file, "r") as f:
+            return f.read().strip()
+    return ""  # Return empty string if no errors are logged
 
 
 def send_to_rabbitmq(message: dict):
@@ -73,7 +81,7 @@ def send_to_rabbitmq(message: dict):
             body=json.dumps(message),
             properties=pika.BasicProperties(delivery_mode=2),
         )
-        print(f" [x] Sent {message}")  # Log every message sent to RabbitMQ
+        print(f" [x] Sent {message}")
         connection.close()
     except pika.exceptions.AMQPConnectionError as e:
         print(f"Failed to connect to RabbitMQ: {e}")
