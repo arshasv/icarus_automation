@@ -1,15 +1,16 @@
 from fastapi import FastAPI, HTTPException, Body
 import subprocess
 import os
+import json
 import pika
 from config import LOCAL_FILE_PATH
 from utils import download_blob
 
 app = FastAPI()
 
-# RabbitMQ connection parameters
-RABBITMQ_HOST = "localhost"  # Replace with your RabbitMQ host if running remotely
+RABBITMQ_HOST = "rabbitmq"
 QUEUE_NAME = "verilog_processing"
+
 
 @app.post("/process-verilog/")
 async def process_verilog(blob_url: str = Body(..., embed=True)):
@@ -23,23 +24,40 @@ async def process_verilog(blob_url: str = Body(..., embed=True)):
         # Run shell script
         subprocess.run(["./scripts/process_verilog.sh", local_file_path], check=True)
 
-        # Check for error output
+        # Check for output files
         error_file = "error_output.json"
+        success_file = "success_output.json"
+
         if os.path.exists(error_file):
             with open(error_file, "r") as f:
                 error_data = json.load(f)
-            
-            send_to_rabbitmq(error_data)  # Send error details to RabbitMQ
 
-            if error_data["status"] == "error":
-                raise HTTPException(status_code=500, detail=error_data["message"])
+            print(f" [x] Sent {error_data}")  # Log the error message before raising an exception
+            send_to_rabbitmq(error_data)
+            raise HTTPException(status_code=500, detail=error_data["message"])
 
-        return {"message": "Icarus Verilog container executed successfully."}
+        if os.path.exists(success_file):
+            with open(success_file, "r") as f:
+                success_data = json.load(f)
+
+            print(f" [x] Sent {success_data}")  # Log the success message
+            send_to_rabbitmq(success_data)
+            return success_data
+
+        # If neither file exists, assume an unknown failure
+        raise HTTPException(status_code=500, detail="Unexpected error occurred. No output file was created.")
 
     except subprocess.CalledProcessError as e:
-        raise HTTPException(status_code=500, detail=f"Shell script error: {str(e)}")
+        error_message = {"status": "error", "message": f"Shell script error: {str(e)}"}
+        print(f" [x] Sent {error_message}")  # Log the error before raising
+        send_to_rabbitmq(error_message)
+        raise HTTPException(status_code=500, detail=error_message["message"])
+
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        error_message = {"status": "error", "message": str(e)}
+        print(f" [x] Sent {error_message}")  # Log the error before raising
+        send_to_rabbitmq(error_message)
+        raise HTTPException(status_code=500, detail=error_message["message"])
 
 
 def send_to_rabbitmq(message: dict):
@@ -55,7 +73,7 @@ def send_to_rabbitmq(message: dict):
             body=json.dumps(message),
             properties=pika.BasicProperties(delivery_mode=2),
         )
-        print(f" [x] Sent {message}")
+        print(f" [x] Sent {message}")  # Log every message sent to RabbitMQ
         connection.close()
     except pika.exceptions.AMQPConnectionError as e:
         print(f"Failed to connect to RabbitMQ: {e}")

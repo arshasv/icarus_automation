@@ -38,7 +38,9 @@ if [ -f "$v_file_path" ]; then
         exit 1
     fi
     
-    echo "{\"status\":\"success\", \"message\":\"Verilog processing completed successfully.\"}" > error_output.json
+    # If no errors, create success output
+    echo "{\"status\":\"success\", \"message\":\"Verification successful.\"}" > success_output.json
+    exit 0
 else
     echo "{\"status\":\"error\", \"message\":\"File not found!\"}" > error_output.json
     exit 1
