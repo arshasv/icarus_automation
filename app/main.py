@@ -11,7 +11,6 @@ app = FastAPI()
 RABBITMQ_HOST = "rabbitmq"
 QUEUE_NAME = "verilog_processing"
 
-
 @app.post("/process-verilog/")
 async def process_verilog(blob_url: str = Body(..., embed=True)):
     try:
