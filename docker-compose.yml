@@ -11,8 +11,21 @@ services:
     environment:
       - AZURE_STORAGE_CONNECTION_STRING=${AZURE_STORAGE_CONNECTION_STRING}
       - BLOB_CONTAINER_NAME=${BLOB_CONTAINER_NAME}
+      - RABBITMQ_HOST=rabbitmq  
+      - RABBITMQ_PORT=5672      
+    depends_on:
+      - rabbitmq                
+    networks:
+      - verilog-network
 
+  rabbitmq:
+    image: rabbitmq:management
+    ports:
+      - "5672:5672" 
+      - "15672:15672" 
+    networks:
+      - verilog-network
 
 networks:
-  default:
+  verilog-network:
     driver: bridge

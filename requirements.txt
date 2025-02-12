@@ -3,3 +3,4 @@ uvicorn
 azure-storage-blob
 python-dotenv
 requests
+pika==1.3.1

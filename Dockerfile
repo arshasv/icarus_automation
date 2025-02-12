@@ -29,5 +29,11 @@ RUN chmod +x /usr/src/app/scripts/process_verilog.sh
 # Expose the FastAPI port
 EXPOSE 8000
 
+# Environment variables for RabbitMQ
+ENV RABBITMQ_HOST=localhost
+ENV RABBITMQ_PORT=5672
+ENV QUEUE_NAME=verilog_processing
+
 # Command to run FastAPI on container startup
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+
