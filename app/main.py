@@ -18,15 +18,20 @@ async def process_verilog(blob_url: str = Body(..., embed=True)):
         blob_name = blob_url.split("/")[-1]
         local_file_path = os.path.join(LOCAL_FILE_PATH, blob_name)
 
+        # Download the .v file
         download_blob(blob_url, local_file_path)
 
+        # Define error log file
         error_log_file = "error_log.txt"
 
+        # Remove previous error log if exists
         if os.path.exists(error_log_file):
             os.remove(error_log_file)
 
+        # Run shell script
         result = subprocess.run(["./scripts/process_verilog.sh", local_file_path], check=False)
 
+        # Check if error log file exists after running the script
         error_log = read_error_log()
 
         if result.returncode != 0 or error_log:
@@ -36,12 +41,10 @@ async def process_verilog(blob_url: str = Body(..., embed=True)):
                 "log": error_log if error_log else "No additional error details available."
             }
             send_to_rabbitmq(response_data)
-            raise HTTPException(status_code=200, detail=response_data)
+            raise HTTPException(status_code=400, detail=response_data)
 
-        message = {
-        "status": "success", 
-        "message": "Verification successful."
-        }
+        # Success response (unchanged)
+        message = {"status": "success", "message": "Verification successful."}
         send_to_rabbitmq(message)
         return message
 
@@ -53,15 +56,8 @@ async def process_verilog(blob_url: str = Body(..., embed=True)):
             "log": error_log if error_log else "No additional error details available."
         }
         send_to_rabbitmq(response_data)
-        raise HTTPException(status_code=200, detail=response_data)
-    
-    except Exception as e:
-        message = {
-        "status": "success", 
-        "message": "Verification successful."
-        }
-        send_to_rabbitmq(message)
-        return message
+        raise HTTPException(status_code=400, detail=response_data)
+
 
 def read_error_log():
     """Reads the contents of error_log.txt if it exists."""
@@ -69,7 +65,8 @@ def read_error_log():
     if os.path.exists(error_log_file):
         with open(error_log_file, "r") as f:
             return f.read().strip()
-    return "" 
+    return ""  # Return empty string if no errors are logged
+
 
 def send_to_rabbitmq(message: dict):
     try:
