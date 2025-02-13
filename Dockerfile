@@ -23,6 +23,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY ./app /usr/src/app
 COPY ./scripts /usr/src/app/scripts
 
+RUN sed -i 's/\r$//' /usr/src/app/scripts/process_verilog.sh
+
 # Make the shell script executable
 RUN chmod +x /usr/src/app/scripts/process_verilog.sh
 
