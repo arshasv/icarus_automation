@@ -33,7 +33,7 @@ EXPOSE 8000
 
 # Environment variables for RabbitMQ
 ENV RABBITMQ_HOST=localhost
-ENV RABBITMQ_PORT=5672
+ENV RABBITMQ_PORT=5673
 ENV QUEUE_NAME=verilog_processing
 
 # Command to run FastAPI on container startup
